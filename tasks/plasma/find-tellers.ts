@@ -13,7 +13,7 @@ const BLOCKS_IN_SIX_MONTHS = Math.round(86_400 * 182 / 12) // 6 months in second
 const FIRST_BLOCK = CURRENT_BLOCK - BLOCKS_IN_SIX_MONTHS    // Arbitrary starting point, before which the Plasma teller probably was not deployed
 
 const DEFAULT_SEARCH_BLOCK_COUNT = 500; // Default number of blocks to search for tellers at a time
-const DEFAULT_SEARCH_REPETITIONS = 50; // Default number of times to repeat the search for tellers
+const DEFAULT_SEARCH_REPETITIONS = 500; // Default number of times to repeat the search for tellers
 
 /**
  Example:
@@ -38,9 +38,12 @@ task("find-tellers", "Given an array of valid authorities, find tellers associat
 
         let activeTellers: Set<string> = new Set(tellersData.activeTellers);
         let inactiveTellers: Set<string> = new Set(tellersData.inactiveTellers);
-        for (let i = 0; i < DEFAULT_SEARCH_REPETITIONS; i++) {
+        const startBlock = tellersData.lastScannedBlock + 1;
+        const finalBlock = Math.min(CURRENT_BLOCK, tellersData.lastScannedBlock + DEFAULT_SEARCH_BLOCK_COUNT * DEFAULT_SEARCH_REPETITIONS);
+        const numRepetitions = Math.ceil((finalBlock - tellersData.lastScannedBlock) / DEFAULT_SEARCH_BLOCK_COUNT);
+        for (let i = 0; i < numRepetitions; i++) {
             const startBlock = tellersData.lastScannedBlock + 1 + i * DEFAULT_SEARCH_BLOCK_COUNT;
-            const endBlock = tellersData.lastScannedBlock + (i + 1) * DEFAULT_SEARCH_BLOCK_COUNT;
+            const endBlock = Math.min(tellersData.lastScannedBlock + (i + 1) * DEFAULT_SEARCH_BLOCK_COUNT, CURRENT_BLOCK);
             console.log(`Searching for tellers in blocks ${startBlock} to ${endBlock}`);
 
             for (let authorityAddress of vaultData.authorityAddresses) {
@@ -76,7 +79,7 @@ task("find-tellers", "Given an array of valid authorities, find tellers associat
         }
 
         // Update last scanned block
-        tellersData.lastScannedBlock = tellersData.lastScannedBlock + DEFAULT_SEARCH_BLOCK_COUNT * DEFAULT_SEARCH_REPETITIONS;
+        tellersData.lastScannedBlock = finalBlock;
 
         // Update active and inactive tellers
         tellersData.activeTellers = Array.from(activeTellers);
@@ -85,7 +88,7 @@ task("find-tellers", "Given an array of valid authorities, find tellers associat
         fs.writeFileSync(tellersPath, JSON.stringify(tellersData));
 
         const endTime = Date.now();
-        console.log(`scanned ${DEFAULT_SEARCH_BLOCK_COUNT * DEFAULT_SEARCH_REPETITIONS} blocks in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
+        console.log(`scanned ${finalBlock - startBlock} blocks in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
     })
 
 function initializeTellersData(data: any) {
